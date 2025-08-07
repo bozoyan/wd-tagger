@@ -1,0 +1,19 @@
+1.将要转换的lora复制至本文件夹
+2.鼠标左键点击lora文件，拖拽到 patch_lora_to_nunchaku.bat 上
+3.系统会自动弹出终端命令行，等待完成即可
+注：需要本地系统的python版本在3.8以上
+
+实现原理：
+Nunchaku 节点：需要特定的权重结构
+标准 LoRA 模型：可能缺少某些权重
+
+原始模型结构：
+├── lora_unet_final_layer_linear.lora_down.weight
+└── lora_unet_final_layer_linear.lora_up.weight
+
+>Nunchaku要求结构：
+├── lora_unet_final_layer_linear.lora_down.weight
+├── lora_unet_final_layer_linear.lora_up.weight
+├── lora_unet_final_layer_adaLN_modulation_1.lora_down.weight  ← 缺失
+└── lora_unet_final_layer_adaLN_modulation_1.lora_up.weight    ← 缺失
+

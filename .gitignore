@@ -2,10 +2,11 @@
 __pycache__/
 *.py[codz]
 *$py.class
-
+app-1.3.0.py
+WD.command
 # C extensions
 *.so
-
+model/model.onnx
 # Distribution / packaging
 .Python
 build/
