@@ -5,9 +5,12 @@
 ## 主要功能
 
 - **双模式操作**:
-  - **本地模型打标**: 利用内置的 `wd-swinv2-tagger-v3` ONNX模型，可以快速分析本地上传的图片，生成一系列精准的英文描述标签，并附带中文翻译。模型下载：https://modelscope.cn/models/shiertier/wd14_tagger/resolve/master/wd-swinv2-tagger-v3.onnx，改名称为model.onnx 放在model文件夹内。
-  - **智谱AI反推**: 集成了强大的智谱AI `glm-4.1v-thinking-flashx` 在线模型。用户只需提供一张图片的URL，即可获得由AI生成的高质量、详细的中英文绘画Prompt，并自动提取对应的标签。
+  - **本地模型打标**: 利用内置的 `wd-swinv2-tagger-v3` ONNX模型，可以快速分析本地上传的图片，生成一系列精准的英文描述标签，并附带中文翻译。
+    模型下载：https://modelscope.cn/models/shiertier/wd14_tagger/resolve/master/wd-swinv2-tagger-v3.onnx
 
+    改名称为model.onnx 放在model文件夹内。
+  - **智谱AI反推**: 集成了强大的智谱AI `glm-4.1v-thinking-flashx` 在线模型。用户只需提供一张图片的URL，即可获得由AI生成的高质量、详细的中英文绘画Prompt，并自动提取对应的标签。
+  
 - **参数可调**: 在使用本地模型时，用户可以根据需求自由调整“常规标签”和“角色标签”的识别阈值，以控制标签生成的粒度。
 
 - **中英双语支持**: 本地模型生成的标签会自动查询翻译库，同时提供中英文结果，方便不同语言习惯的用户。
