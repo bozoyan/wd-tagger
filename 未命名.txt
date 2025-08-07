@@ -1,0 +1,11 @@
+cd /Volumes/AI/AI/Whisper_Input
+
+git init                             # 初始化本地 Git 仓库
+git remote add origin https://github.com/bozoyan/Whisper_Input.git
+git add .                            # 添加所有文件
+git commit -m "Initial commit"       # 提交到本地仓库
+git branch -M main                   # 设置分支为 main（GitHub 默认是 main）
+# 拉取远程的 main 分支内容并自动合并
+git pull origin main --allow-unrelated-histories
+git push -u origin main             # 推送到远程 GitHub 仓库
+git push --force origin main    #强制覆盖
