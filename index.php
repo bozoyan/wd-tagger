@@ -230,6 +230,16 @@
             transform: translateY(-50%);
             color: #64748b;
         }
+
+        /* 新增：上传区域样式 */
+        #uploadForm {
+            display: none;
+        }
+
+        .drag-active {
+            border-color: #6366f1 !important;
+            background-color: rgba(99, 102, 241, 0.05) !important;
+        }
     </style>
 </head>
 <body class="min-h-screen transition-colors duration-300">
@@ -466,12 +476,20 @@
                         批量处理
                     </h2>
                     
+                    <!-- Hidden Form for File Upload -->
+                    <form id="uploadForm" enctype="multipart/form-data">
+                        <input type="hidden" name="folderName" id="formFolderName">
+                        <input type="hidden" name="customPrompt" id="formCustomPrompt">
+                        <input type="hidden" name="apiKey" id="formApiKey">
+                        <input type="hidden" name="tagTypes" id="formTagTypes">
+                        <input type="file" name="images[]" id="batchInput" class="hidden" webkitdirectory directory multiple accept="image/*">
+                    </form>
+                    
                     <!-- Drag & Drop Area -->
                     <div class="mb-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center hover:border-indigo-500 dark:hover:border-indigo-400 transition-all cursor-pointer" id="batchDropArea">
                         <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 dark:text-gray-500 mb-4"></i>
                         <h3 class="text-lg font-medium mb-2">拖放图片文件夹或点击选择</h3>
                         <p class="text-sm text-gray-600 dark:text-gray-400">支持 JPG, PNG, GIF, WEBP 格式</p>
-                        <input type="file" id="batchInput" class="hidden" webkitdirectory directory multiple accept="image/*">
                     </div>
                     
                     <!-- File List -->
@@ -516,9 +534,9 @@
                             </p>
                         </div>
                         <div class="mt-4 flex justify-center">
-                            <button id="downloadResultsBtn" class="bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white px-6 py-3 rounded-lg font-medium transition-all flex items-center justify-center">
+                            <a id="downloadLink" href="#" class="bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white px-6 py-3 rounded-lg font-medium transition-all flex items-center justify-center">
                                 <i class="fas fa-download mr-2"></i>下载所有结果
-                            </button>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -602,6 +620,7 @@
         const fileCount = document.getElementById('fileCount');
         const totalSize = document.getElementById('totalSize');
         const clearFileListBtn = document.getElementById('clearFileList');
+        const uploadForm = document.getElementById('uploadForm');
         
         let selectedFiles = [];
         
@@ -609,55 +628,38 @@
             batchInput.click();
         });
         
+        batchInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+        
         batchDropArea.addEventListener('dragover', (e) => {
             e.preventDefault();
-            batchDropArea.classList.add('border-indigo-500', 'dark:border-indigo-400', 'bg-indigo-50', 'dark:bg-indigo-900/10');
+            batchDropArea.classList.add('drag-active');
         });
         
         batchDropArea.addEventListener('dragleave', () => {
-            batchDropArea.classList.remove('border-indigo-500', 'dark:border-indigo-400', 'bg-indigo-50', 'dark:bg-indigo-900/10');
+            batchDropArea.classList.remove('drag-active');
         });
         
         batchDropArea.addEventListener('drop', (e) => {
             e.preventDefault();
-            batchDropArea.classList.remove('border-indigo-500', 'dark:border-indigo-400', 'bg-indigo-50', 'dark:bg-indigo-900/10');
-            
+            batchDropArea.classList.remove('drag-active');
+            handleFiles(e.dataTransfer.files);
+        });
+        
+        function handleFiles(files) {
             selectedFiles = [];
             fileListContainer.innerHTML = '';
             
-            if (e.dataTransfer.items) {
-                // Use DataTransferItemList interface to access the file(s)
-                for (let i = 0; i < e.dataTransfer.items.length; i++) {
-                    if (e.dataTransfer.items[i].kind === 'file') {
-                        const file = e.dataTransfer.items[i].getAsFile();
-                        if (file.type.startsWith('image/')) {
-                            selectedFiles.push(file);
-                        }
-                    }
-                }
-            } else {
-                // Use DataTransfer interface to access the file(s)
-                for (let i = 0; i < e.dataTransfer.files.length; i++) {
-                    const file = e.dataTransfer.files[i];
-                    if (file.type.startsWith('image/')) {
-                        selectedFiles.push(file);
-                    }
-                }
-            }
-            
-            displayBatchFiles();
-        });
-        
-        batchInput.addEventListener('change', (e) => {
-            selectedFiles = [];
-            for (let i = 0; i < e.target.files.length; i++) {
-                const file = e.target.files[i];
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
                 if (file.type.startsWith('image/')) {
                     selectedFiles.push(file);
                 }
             }
+            
             displayBatchFiles();
-        });
+        }
         
         function displayBatchFiles() {
             fileListContainer.innerHTML = '';
@@ -803,7 +805,11 @@
         const successCount = document.getElementById('successCount');
         const failCount = document.getElementById('failCount');
         const resultFolder = document.getElementById('resultFolder');
-        const downloadResultsBtn = document.getElementById('downloadResultsBtn');
+        const downloadLink = document.getElementById('downloadLink');
+        const formFolderName = document.getElementById('formFolderName');
+        const formCustomPrompt = document.getElementById('formCustomPrompt');
+        const formApiKey = document.getElementById('formApiKey');
+        const formTagTypes = document.getElementById('formTagTypes');
         
         batchProcessBtn.addEventListener('click', async () => {
             if (selectedFiles.length === 0) {
@@ -831,80 +837,49 @@
                 return;
             }
             
+            // Update form fields
+            formFolderName.value = folderName;
+            formCustomPrompt.value = customPrompt;
+            formApiKey.value = apiKey;
+            formTagTypes.value = JSON.stringify(selectedTagTypes);
+            
+            // Create FormData object
+            const formData = new FormData(uploadForm);
+            selectedFiles.forEach(file => {
+                formData.append('images[]', file);
+            });
+            
             // Show progress container
             batchProgressContainer.classList.remove('hidden');
             batchResultsContainer.classList.add('hidden');
             
-            let success = 0;
-            let fail = 0;
-            
-            // Process each file
-            for (let i = 0; i < selectedFiles.length; i++) {
-                const file = selectedFiles[i];
-                const fileNum = i + 1;
+            try {
+                const response = await fetch('process.php', {
+                    method: 'POST',
+                    body: formData
+                });
                 
-                // Update progress
-                currentFileNum.textContent = fileNum;
-                totalFileNum.textContent = selectedFiles.length;
-                batchProgressBar.style.width = ((fileNum - 1) / selectedFiles.length * 100) + '%';
-                batchProgressText.textContent = `正在处理第 ${fileNum} 张图片，共 ${selectedFiles.length} 张`;
-                
-                try {
-                    // Convert file to data URL
-                    const dataUrl = await readFileAsDataURL(file);
-                    
-                    // Call AI API
-                    const result = await callZhipuAIAPI(dataUrl, apiKey, customPrompt);
-                    
-                    // Extract content
-                    const chineseDescMatch = result.match(/★★中文描述★★\s*([\s\S]*?)(?=■■英文描述■■|$)/);
-                    const englishDescMatch = result.match(/■■英文描述■■\s*([\s\S]*?)(?=【中文Tag标签】|$)/);
-                    const chineseTagsMatch = result.match(/【中文Tag标签】\s*([^\]]*?)(?=\[英文Tag标签\]|$)/);
-                    const englishTagsMatch = result.match(/\[英文Tag标签\]\s*([^\]]*?)(?=$)/);
-                    
-                    // Create content based on selected types
-                    let content = '';
-                    if (selectedTagTypes.includes('chineseDesc') && chineseDescMatch) {
-                        content += `★★中文描述★★\n${chineseDescMatch[1].trim()}\n\n`;
-                    }
-                    if (selectedTagTypes.includes('englishDesc') && englishDescMatch) {
-                        content += `■■英文描述■■\n${englishDescMatch[1].trim()}\n\n`;
-                    }
-                    if (selectedTagTypes.includes('englishTags') && englishTagsMatch) {
-                        content += `[英文Tag标签]\n${englishTagsMatch[1].trim()}\n`;
-                    }
-                    
-                    // Save to "file" (in browser, we'll create a downloadable blob)
-                    const fileName = `${fileNum}.txt`;
-                    const blob = new Blob([content], { type: 'text/plain' });
-                    
-                    success++;
-                } catch (error) {
-                    console.error(`处理文件 ${file.name} 时出错:`, error);
-                    fail++;
+                if (!response.ok) {
+                    throw new Error('服务器处理失败');
                 }
-            }
-            
-            // Complete
-            batchProgressBar.style.width = '100%';
-            batchProgressText.textContent = '批量处理完成!';
-            
-            setTimeout(() => {
+                
+                const result = await response.json();
+                
+                // Update UI with results
+                successCount.textContent = result.success;
+                failCount.textContent = result.fail;
+                resultFolder.textContent = result.outputDir;
+                downloadLink.href = result.zipFile;
+                
                 batchProgressContainer.classList.add('hidden');
-                successCount.textContent = success;
-                failCount.textContent = fail;
-                resultFolder.textContent = `output/${folderName}/`;
                 batchResultsContainer.classList.remove('hidden');
-            }, 1000);
-        });
-        
-        // Download Results
-        downloadResultsBtn.addEventListener('click', () => {
-            // Create a zip file with all results (simulated)
-            showNotification('结果文件已准备下载', 'success');
-            
-            // In a real PHP implementation, this would trigger a server-side zip download
-            // For demo purposes, we'll just show a notification
+                
+                showNotification('批量处理完成！', 'success');
+                
+            } catch (error) {
+                showNotification('处理失败: ' + error.message, 'error');
+                batchProgressContainer.classList.add('hidden');
+            }
         });
         
         // Display Results
@@ -1068,17 +1043,7 @@ ${englishTags}
             }, 3000);
         }
         
-        // Helper function to read file as data URL
-        function readFileAsDataURL(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-        }
-        
-        // Mock AI API call (replace with actual API call in production)
+        // Mock AI API call for single image (replace with actual API call in production)
         async function callZhipuAIAPI(imageUrl, apiKey, customPrompt = '') {
             // Simulate API delay
             await new Promise(resolve => setTimeout(resolve, 2000));
@@ -1108,51 +1073,3 @@ city, street, skyscrapers, crowd, sunshine, bustling, modern, urban, vitality, e
     </script>
 </body>
 </html>
-
-<?php
-    
-// 1. 获取用户设置
-$folderName = $_POST['folderName'] ?: date('Ymd_His'); // 如果未命名，则用时间
-$selectedTypes = $_POST['tagTypes']; // 例如: ['chineseDesc', 'englishTags']
-
-// 2. 创建输出目录
-$outputDir = "output/" . $folderName . "/";
-if (!is_dir($outputDir)) {
-    mkdir($outputDir, 0755, true); // 递归创建目录
-}
-
-// 3. 处理上传的每个文件
-$i = 1;
-foreach ($_FILES['images']['tmp_name'] as $key => $tmpName) {
-    if ($_FILES['images']['error'][$key] == UPLOAD_ERR_OK) {
-        $newImageName = $i . ".jpg"; // 简化处理，假设都是jpg
-        $newImagePath = $outputDir . $newImageName;
-        
-        // 保存重命名后的图片
-        move_uploaded_file($tmpName, $newImagePath);
-        
-        // 4. 调用智谱AI API (此处为伪代码)
-        $aiResult = callZhipuAIAPI($newImagePath); // 您需要实现这个函数
-        
-        // 5. 根据选择的类型，构建TXT内容
-        $txtContent = "";
-        if (in_array('chineseDesc', $selectedTypes)) {
-            $txtContent .= "★★中文描述★★\n" . $aiResult['chineseDesc'] . "\n\n";
-        }
-        if (in_array('englishDesc', $selectedTypes)) {
-            $txtContent .= "■■英文描述■■\n" . $aiResult['englishDesc'] . "\n\n";
-        }
-        if (in_array('englishTags', $selectedTypes)) {
-            $txtContent .= "[英文Tag标签]\n" . $aiResult['englishTags'] . "\n";
-        }
-        
-        // 6. 保存TXT文件
-        $txtFileName = $i . ".txt";
-        file_put_contents($outputDir . $txtFileName, $txtContent);
-        
-        $i++;
-    }
-}
-
-echo "处理完成！文件已保存至: " . $outputDir;
-?>
