@@ -186,7 +186,7 @@ function callZhipuAIAPI($imagePath, $apiKey, $customPrompt = '') {
     $mimeType = mime_content_type($imagePath);
     
     // 构建系统提示
-    $systemPrompt = "你是一个AI绘画提示词专家。请根据我提供的图片进行文字描述，形成用于AI绘画的一段非常丰富的中英文画面详细描述，这些描述信息将重新用于AI绘画的prompt，并且另将中英文的prompt描述内容分别简化成对应的tag标签。最后返回的是一个 json 的数组数据信息， json 里面包含四段信息分别是：cn（用于AI绘画的中文详细自然语言信息Prompt）、en （用于AI绘画的英文详细信息Prompt）、cn-tag（中文Tag标签用中文逗号内部区分）、en-tag(英文Tag标签用英文逗号内部隔开)。不需要输出无用markdown语言注释信息，直接输出 json 格式的数据。";
+    $systemPrompt = "你是一个AI绘画提示词专家。请根据我提供的图片进行文字描述，形成用于AI绘画的一段非常丰富的中英文画面详细描述，这些描述信息将重新用于AI绘画的prompt，并且另将中英文的prompt描述内容分别简化成对应的tag标签。最后返回的是一个 json 的数组数据信息， json 里面包含四段信息分别是：cn（用于AI绘画的中文详细自然语言信息Prompt）、en （用于AI绘画的英文详细信息Prompt）、cn-tag（中文Tag标签用中文逗号内部区分）、en-tag(英文Tag标签用英文逗号内部隔开)。不需要输出无用的````信息，直接输出 json 格式的数据。";
     
     $fullPrompt = $customPrompt ? $customPrompt . "\n" . $systemPrompt : $systemPrompt;
     
@@ -212,7 +212,7 @@ function callZhipuAIAPI($imagePath, $apiKey, $customPrompt = '') {
             ]
         ],
         "thinking" => [
-            "type" => "enabled"
+            "type" => "disabled"
         ]
     ];
     
@@ -250,7 +250,7 @@ function callZhipuAIAPI($imagePath, $apiKey, $customPrompt = '') {
     error_log("Process.php - 原始AI内容: " . substr($aiContent, 0, 200));
     
     // 处理thinking标签 - 移除<\|begin_of_thought\|>和<\|end_of_thought\|>标签之间的内容
-    $cleanContent = preg_replace('/<\|begin_of_thought\|>.*?<\|end_of_thought\|>/s', '', $aiContent);
+    $cleanContent = preg_replace('/<\|begin_of_box\|>.*?<\|end_of_box\|>/s', '', $aiContent);
     $cleanContent = trim($cleanContent);
     
     // 调试输出
@@ -262,6 +262,23 @@ function callZhipuAIAPI($imagePath, $apiKey, $customPrompt = '') {
         $jsonData = json_decode($cleanContent, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
             $jsonData = null;
+        }
+    }
+    
+    // 如果上面的方法失败了，尝试直接从原始内容中提取JSON
+    if (!$jsonData) {
+        // 使用正则表达式提取<|begin_of_box|>和<|end_of_box|>之间的内容
+        if (preg_match('/<\|begin_of_box\|>(.*?)<\|end_of_box\|>/s', $aiContent, $matches)) {
+            $jsonString = trim($matches[1]);
+            $jsonData = json_decode($jsonString, true);
+            
+            // 如果还是解析失败，尝试清理字符串
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                // 移除可能的多余字符
+                $jsonString = preg_replace('/^\s*```(?:json)?\s*/', '', $jsonString);
+                $jsonString = preg_replace('/\s*```\s*$/', '', $jsonString);
+                $jsonData = json_decode($jsonString, true);
+            }
         }
     }
     

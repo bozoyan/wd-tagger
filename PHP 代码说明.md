@@ -32,7 +32,7 @@ curl -X POST \
       }
     ],
     "thinking": {
-      "type":"enabled"
+      "type":"disabled"
     }
   }'
 
@@ -41,7 +41,7 @@ curl -X POST \
 <|begin_of_box|>{"cn":"一位拥有短款渐变色头发的女性，发色从暖棕色过渡到紫色与蓝色，发丝轻盈飘逸；她身着白色褶皱领口的上衣，佩戴精致珍珠耳环与细金项链；背景是柔和的水彩风格，融合了淡蓝色天空、浅绿色草地与朦胧的光影，整体氛围清新梦幻，光线明亮温暖。","en":"A woman with short gradient hair, transitioning from warm brown to purple and blue, her hair strands light and flowing; she wears a white blouse with pleated neckline, delicate pearl earrings, and a thin gold necklace; the background is in soft watercolor style, blending pale blue sky, light green grass, and hazy light and shadow, creating a fresh and dreamy atmosphere with bright and warm lighting.","cn-tag":"短款渐变色头发,白色褶皱上衣,珍珠耳环,细金项链,水彩背景,清新梦幻","en-tag":"short gradient hair, white pleated blouse, pearl earrings, thin gold necklace, watercolor background, fresh dreamy"}<|end_of_box|>
 
 
-系统应该能够：
+网站界面上应该能够：
 
   1. 中文描述：显示 cn 字段的内容
   2. 英文描述：显示 en 字段的内容
