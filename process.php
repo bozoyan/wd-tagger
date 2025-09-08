@@ -64,6 +64,7 @@ $success = 0;
 $fail = 0;
 $uploadedFiles = [];
 
+
 if (isset($_FILES['images']) && !empty($_FILES['images']['name'][0])) {
     $files = $_FILES['images'];
     
@@ -130,6 +131,7 @@ if (isset($_FILES['images']) && !empty($_FILES['images']['name'][0])) {
         }
     }
 } else {
+    error_log("没有上传任何文件，FILES信息: " . print_r($_FILES, true));
     echo json_encode(['error' => '没有上传任何文件']);
     exit;
 }
@@ -249,40 +251,36 @@ function callZhipuAIAPI($imagePath, $apiKey, $customPrompt = '') {
     // 调试输出
     error_log("Process.php - 原始AI内容: " . substr($aiContent, 0, 200));
     
-    // 处理thinking标签 - 移除<\|begin_of_thought\|>和<\|end_of_thought\|>标签之间的内容
-    $cleanContent = preg_replace('/<\|begin_of_box\|>.*?<\|end_of_box\|>/s', '', $aiContent);
-    $cleanContent = trim($cleanContent);
-    
-    // 调试输出
-    error_log("Process.php - 清理后内容: " . substr($cleanContent, 0, 200));
-    
-    // 尝试解析JSON数据
+    // 尝试直接从<|begin_of_box|>和<|end_of_box|>标签中提取JSON数据
     $jsonData = null;
-    if (!empty($cleanContent)) {
-        $jsonData = json_decode($cleanContent, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            $jsonData = null;
-        }
+    if (preg_match('/<\|begin_of_box\|>(.*?)<\|end_of_box\|>/s', $aiContent, $matches)) {
+        $jsonString = trim($matches[1]);
+        // 清理可能的额外字符
+        $jsonString = preg_replace('/^\s*```(?:json)?\s*/', '', $jsonString);
+        $jsonString = preg_replace('/\s*```\s*$/', '', $jsonString);
+        $jsonData = json_decode($jsonString, true);
+        
+        // 调试输出
+        error_log("Process.php - 提取的JSON字符串: " . substr($jsonString, 0, 200));
     }
     
-    // 如果上面的方法失败了，尝试直接从原始内容中提取JSON
+    // 如果上面的方法失败了，尝试直接解析整个内容
     if (!$jsonData) {
-        // 使用正则表达式提取<|begin_of_box|>和<|end_of_box|>之间的内容
-        if (preg_match('/<\|begin_of_box\|>(.*?)<\|end_of_box\|>/s', $aiContent, $matches)) {
-            $jsonString = trim($matches[1]);
-            $jsonData = json_decode($jsonString, true);
-            
-            // 如果还是解析失败，尝试清理字符串
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                // 移除可能的多余字符
-                $jsonString = preg_replace('/^\s*```(?:json)?\s*/', '', $jsonString);
-                $jsonString = preg_replace('/\s*```\s*$/', '', $jsonString);
-                $jsonData = json_decode($jsonString, true);
-            }
+        // 移除标签后再尝试解析
+        $cleanContent = preg_replace('/<\|begin_of_box\|>.*?<\|end_of_box\|>/s', '', $aiContent);
+        $cleanContent = trim($cleanContent);
+        
+        if (!empty($cleanContent)) {
+            $jsonData = json_decode($cleanContent, true);
+        }
+        
+        // 如果还是失败，尝试直接解析原始内容
+        if (!$jsonData) {
+            $jsonData = json_decode($aiContent, true);
         }
     }
     
-    if ($jsonData) {
+    if ($jsonData && is_array($jsonData)) {
         // 使用解析后的JSON数据
         return [
             'chineseDesc' => $jsonData['cn'] ?? '',
@@ -293,6 +291,7 @@ function callZhipuAIAPI($imagePath, $apiKey, $customPrompt = '') {
         ];
     } else {
         // 如果JSON解析失败，返回错误
+        error_log("Process.php - JSON解析失败，原始内容: " . $aiContent);
         return ['error' => '无法解析AI返回的JSON数据'];
     }
 }
