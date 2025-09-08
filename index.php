@@ -318,7 +318,7 @@ $image_url = '';
                 <div class="card p-6 shadow-xl glow-effect mt-8">
                     <h2 class="text-2xl font-bold mb-6 flex items-center">
                         <i class="fas fa-folder mr-3 text-indigo-600 dark:text-indigo-400"></i>
-                        批量处理设置
+                        批量打标处理设置
                     </h2>
                     
                     <!-- Folder Name Input -->
