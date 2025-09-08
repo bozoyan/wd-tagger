@@ -18,6 +18,26 @@ $customPrompt = $_POST['customPrompt'] ?? '';
 $apiKey = $_POST['apiKey'] ?? '';
 $tagTypesJson = $_POST['tagTypes'] ?? '[]';
 
+// 函数：从@BOZO.env文件读取API密钥
+function loadApiKeyFromEnv() {
+    $envFile = 'BOZO.env';
+    if (file_exists($envFile)) {
+        $content = file_get_contents($envFile);
+        if ($content !== false) {
+            // 查找 ZHIPUAI_API_KEY=your_api_key_here 格式
+            if (preg_match('/^ZHIPUAI_API_KEY\s*=\s*(.+)$/m', $content, $matches)) {
+                return trim($matches[1]);
+            }
+        }
+    }
+    return null;
+}
+
+// 优先从@BOZO.env文件获取API密钥，如果没有则使用表单提交的值
+if (empty($apiKey)) {
+    $apiKey = loadApiKeyFromEnv();
+}
+
 // 解析标签类型
 $selectedTagTypes = json_decode($tagTypesJson, true);
 if (json_last_error() !== JSON_ERROR_NONE) {
@@ -166,14 +186,14 @@ function callZhipuAIAPI($imagePath, $apiKey, $customPrompt = '') {
     $mimeType = mime_content_type($imagePath);
     
     // 构建系统提示
-    $systemPrompt = "请提供这些图片的中英文详细描述，这些描述信息将用于AI绘画的prompt，中文描述用两个五角星'★★中文描述★★'符号一起包围，英文描述用两个方块'■■英文描述■■'符号一起包围。最后再将中英文的prompt描述内容简化成tag标签。中文Tag标签用中文大写书括号'【中文Tag标签】'符号一起包围，英文Tag标签用英文小写书括号'[英文Tag标签]'符号一起包围，中英文的每个tag标签在包围符号内用英文逗号分割。最后返回的四段信息分别是：中文详细信息（用于AI绘画的Prompt）、 英文详细信息（用于AI绘画的Prompt）、中文Tag标签、英文Tag标签。不要出现 markdown 标签，也不要出现注释信息。";
+    $systemPrompt = "你是一个AI绘画提示词专家。请根据我提供的图片进行文字描述，形成用于AI绘画的一段非常丰富的中英文画面详细描述，这些描述信息将重新用于AI绘画的prompt，并且另将中英文的prompt描述内容分别简化成对应的tag标签。最后返回的是一个 json 的数组数据信息， json 里面包含四段信息分别是：cn（用于AI绘画的中文详细自然语言信息Prompt）、en （用于AI绘画的英文详细信息Prompt）、cn-tag（中文Tag标签用中文逗号内部区分）、en-tag(英文Tag标签用英文逗号内部隔开)。不需要输出无用markdown语言注释信息，直接输出 json 格式的数据。";
     
     $fullPrompt = $customPrompt ? $customPrompt . "\n" . $systemPrompt : $systemPrompt;
     
     // 准备API请求
     $url = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
     $data = [
-        "model" => "glm-4v",
+        "model" => "glm-4.5v",
         "messages" => [
             [
                 "role" => "user",
@@ -190,6 +210,9 @@ function callZhipuAIAPI($imagePath, $apiKey, $customPrompt = '') {
                     ]
                 ]
             ]
+        ],
+        "thinking" => [
+            "type" => "enabled"
         ]
     ];
     
@@ -223,38 +246,37 @@ function callZhipuAIAPI($imagePath, $apiKey, $customPrompt = '') {
     // 提取AI返回的内容
     $aiContent = $response['choices'][0]['message']['content'] ?? '';
     
-    // 使用正则表达式提取各部分内容
-    $chineseDesc = '';
-    $englishDesc = '';
-    $chineseTags = '';
-    $englishTags = '';
+    // 调试输出
+    error_log("Process.php - 原始AI内容: " . substr($aiContent, 0, 200));
     
-    // 提取中文描述
-    if (preg_match('/★★中文描述★★\s*([\s\S]*?)(?=■■英文描述■■|$)/', $aiContent, $matches)) {
-        $chineseDesc = trim($matches[1]);
+    // 处理thinking标签 - 移除<\|begin_of_thought\|>和<\|end_of_thought\|>标签之间的内容
+    $cleanContent = preg_replace('/<\|begin_of_thought\|>.*?<\|end_of_thought\|>/s', '', $aiContent);
+    $cleanContent = trim($cleanContent);
+    
+    // 调试输出
+    error_log("Process.php - 清理后内容: " . substr($cleanContent, 0, 200));
+    
+    // 尝试解析JSON数据
+    $jsonData = null;
+    if (!empty($cleanContent)) {
+        $jsonData = json_decode($cleanContent, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $jsonData = null;
+        }
     }
     
-    // 提取英文描述
-    if (preg_match('/■■英文描述■■\s*([\s\S]*?)(?=【中文Tag标签】|$)/', $aiContent, $matches)) {
-        $englishDesc = trim($matches[1]);
+    if ($jsonData) {
+        // 使用解析后的JSON数据
+        return [
+            'chineseDesc' => $jsonData['cn'] ?? '',
+            'englishDesc' => $jsonData['en'] ?? '',
+            'chineseTags' => $jsonData['cn-tag'] ?? '',
+            'englishTags' => $jsonData['en-tag'] ?? '',
+            'rawContent' => $aiContent
+        ];
+    } else {
+        // 如果JSON解析失败，返回错误
+        return ['error' => '无法解析AI返回的JSON数据'];
     }
-    
-    // 提取中文标签
-    if (preg_match('/【中文Tag标签】\s*([^\]]*?)(?=\[英文Tag标签\]|$)/', $aiContent, $matches)) {
-        $chineseTags = trim($matches[1]);
-    }
-    
-    // 提取英文标签
-    if (preg_match('/\[英文Tag标签\]\s*([^\]]*?)(?=$)/', $aiContent, $matches)) {
-        $englishTags = trim($matches[1]);
-    }
-    
-    return [
-        'chineseDesc' => $chineseDesc,
-        'englishDesc' => $englishDesc,
-        'chineseTags' => $chineseTags,
-        'englishTags' => $englishTags,
-        'rawContent' => $aiContent
-    ];
 }
 ?>

@@ -1,70 +1,3 @@
-<?php
-// 如果有响应信息数据，进行解析
-$parsedResponse = [];
-$image_url = '';
-$response_data = '';
-
-// 优先从POST获取数据
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['response_data'])) {
-    $response_data = $_POST['response_data'];
-    $image_url = $_POST['image_url'] ?? '';
-} 
-// 然后从GET获取数据
-elseif (isset($_GET['response_data']) && !empty($_GET['response_data'])) {
-    $response_data = $_GET['response_data'];
-    // 处理URL解码（可能被多次编码）
-    while (strpos($response_data, '%') !== false) {
-        $response_data = urldecode($response_data);
-    }
-}
-
-if (!empty($response_data)) {
-    // 调试输出
-    error_log("原始响应数据长度: " . strlen($response_data));
-    error_log("原始响应数据: " . substr($response_data, 0, 500));
-    
-    // 处理thinking标签 - 移除<|begin_of_thought|>和<|end_of_thought|>标签之间的内容
-    $clean_content = preg_replace('/<\|begin_of_thought\|>.*?<\|end_of_thought\|>/s', '', $response_data);
-    $clean_content = trim($clean_content);
-    
-    // 调试输出
-    error_log("清理后内容长度: " . strlen($clean_content));
-    error_log("清理后内容: " . substr($clean_content, 0, 500));
-    
-    // 尝试解析JSON数据
-    $json_data = json_decode($clean_content, true);
-    if (json_last_error() === JSON_ERROR_NONE && $json_data) {
-        $parsedResponse = [
-            'cn' => $json_data['cn'] ?? '',
-            'en' => $json_data['en'] ?? '',
-            'cn_tag' => $json_data['cn-tag'] ?? '',
-            'en_tag' => $json_data['en-tag'] ?? ''
-        ];
-        error_log("JSON解析成功: " . print_r($parsedResponse, true));
-    } else {
-        error_log("JSON解析失败: " . json_last_error_msg());
-        // 如果JSON解析失败，尝试手动提取数据
-        if (preg_match('/"cn":\s*"([^"]+)"/', $clean_content, $matches)) {
-            $parsedResponse['cn'] = $matches[1];
-            error_log("手动提取cn: " . $matches[1]);
-        }
-        if (preg_match('/"en":\s*"([^"]+)"/', $clean_content, $matches)) {
-            $parsedResponse['en'] = $matches[1];
-            error_log("手动提取en: " . $matches[1]);
-        }
-        if (preg_match('/"cn-tag":\s*"([^"]+)"/', $clean_content, $matches)) {
-            $parsedResponse['cn_tag'] = $matches[1];
-            error_log("手动提取cn-tag: " . $matches[1]);
-        }
-        if (preg_match('/"en-tag":\s*"([^"]+)"/', $clean_content, $matches)) {
-            $parsedResponse['en_tag'] = $matches[1];
-            error_log("手动提取en-tag: " . $matches[1]);
-        }
-    }
-    
-    error_log("最终解析结果: " . print_r($parsedResponse, true));
-}
-?>
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -526,26 +459,13 @@ if (!empty($response_data)) {
                                 <div id="englishTags" class="flex flex-wrap gap-2 mt-3"></div>
                             </div>
                         </div>
-
-                       <!-- Copy All Button -->
-                       <div class="mt-6 text-center">
+                        
+                        <!-- Copy All Button -->
+                        <div class="mt-6 text-center">
                             <button id="copyAllBtn" class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-lg font-medium transition-all flex items-center justify-center mx-auto">
                                 <i class="fas fa-copy mr-2"></i>复制全部结果
                             </button>
-                        </div>  
-
-                    <!-- Response Info Display -->
-                    <div id="responseInfo" class="mb-6 hidden">
-                        <h3 class="font-semibold mb-3 flex items-center">
-                            <i class="fas fa-info-circle mr-2 text-indigo-600 dark:text-indigo-400"></i>
-                            响应信息
-                        </h3>
-                        <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
-                            <pre id="responseContent" class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap"></pre>
                         </div>
-                    </div>
-
-                       
                     </div>
                 </div>
                 
@@ -555,7 +475,6 @@ if (!empty($response_data)) {
                         <i class="fas fa-images mr-3 text-indigo-600 dark:text-indigo-400"></i>
                         批量处理
                     </h2>
-                    
                     
                     <!-- Hidden Form for File Upload -->
                     <form id="uploadForm" enctype="multipart/form-data">
@@ -660,7 +579,7 @@ if (!empty($response_data)) {
         const apiKeyInput = document.getElementById('apiKey');
         const saveApiKeyBtn = document.getElementById('saveApiKey');
         
-        // Function to load API key from BOZO.env file
+        // Function to load API key from @BOZO.env file
         async function loadApiKeyFromEnv() {
             try {
                 const response = await fetch('BOZO.env');
@@ -677,7 +596,7 @@ if (!empty($response_data)) {
             return null;
         }
         
-        // Load API key: first from BOZO.env, then from localStorage
+        // Load API key: first from @BOZO.env, then from localStorage
         async function initializeApiKey() {
             const envApiKey = await loadApiKeyFromEnv();
             if (envApiKey) {
@@ -695,57 +614,6 @@ if (!empty($response_data)) {
         // Initialize API key on page load
         initializeApiKey();
         
-        // 页面加载时检查是否有解析后的响应数据
-        document.addEventListener('DOMContentLoaded', function() {
-            let hasData = false;
-            
-            <?php if (!empty($parsedResponse)): ?>
-                // 有PHP解析的数据
-                const resultsContainer = document.getElementById('resultsContainer');
-                resultsContainer.classList.remove('hidden');
-                
-                // 显示通知
-                showNotification('AI响应数据已成功解析并显示！', 'success');
-                
-                // 设置上传的图片
-                const resultImage = document.getElementById('resultImage');
-                <?php if (!empty($image_url)): ?>
-                    resultImage.src = '<?php echo addslashes($image_url); ?>';
-                <?php else: ?>
-                    // 如果没有图片URL，设置默认图片
-                    if (!resultImage.src || resultImage.src.includes('data:')) {
-                        resultImage.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2Y0ZjRmNCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE4IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+6L+B55So6byg5qCH56e75Yqo5Yiw5qOJ6aKY5LiK5L2T6aqM5rC055qE5pWI5p6c77yB5omA55yL6aKY5LiK5LiN5ZCM6IKl5Yy65Z+f5Lya5Ye655WO5q2j55qE5rC05ru05pma5pWj54m55pWI44CC</text></svg>';
-                    }
-                <?php endif; ?>
-                
-                console.log('使用PHP解析的数据:', <?php echo json_encode($parsedResponse); ?>);
-                hasData = true;
-            <?php endif; ?>
-            
-            // 检查localStorage中是否有数据
-            if (!hasData) {
-                const storedData = localStorage.getItem('ai_response_data');
-                const storedImageUrl = localStorage.getItem('image_url');
-                
-                if (storedData) {
-                    console.log('从localStorage获取数据');
-                    displayResults(storedData, storedImageUrl || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2Y0ZjRmNCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE4IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+6L+B55So6byg5qCH56e75Yqo5Yiw5qOJ6aKY5LiK5L2T6aqM5rC055qE5pWI5p6c77yB5omA55yL6aKY5LiK5LiN5ZCM6IKl5Yy65Z+f5Lya5Ye655WO5q2j55qE5rC05ru05pma5pWj54m55pWI44CC</text></svg>');
-                    
-                    const resultsContainer = document.getElementById('resultsContainer');
-                    resultsContainer.classList.remove('hidden');
-                    
-                    // 显示通知
-                    showNotification('AI响应数据已成功解析并显示！', 'success');
-                    
-                    // 清除localStorage
-                    localStorage.removeItem('ai_response_data');
-                    localStorage.removeItem('image_url');
-                } else {
-                    console.log('没有找到任何数据，等待用户操作');
-                }
-            }
-        });
-        
         saveApiKeyBtn.addEventListener('click', () => {
             const apiKey = apiKeyInput.value.trim();
             if (apiKey) {
@@ -756,7 +624,6 @@ if (!empty($response_data)) {
             }
         });
         
-            
         // Image Input Handling
         const imageInput = document.getElementById('imageInput');
         const fileInput = document.getElementById('fileInput');
@@ -912,15 +779,9 @@ if (!empty($response_data)) {
                 return;
             }
             
-            // Clear previous data
-            clearPreviousResults();
-            
             // Show progress
             progressContainer.classList.remove('hidden');
             resultsContainer.classList.add('hidden');
-            
-            // Hide response info
-            document.getElementById('responseInfo').classList.add('hidden');
             
             try {
                 // Simulate progress
@@ -935,40 +796,30 @@ if (!empty($response_data)) {
                     progressText.textContent = `正在处理... ${progress}%`;
                 }, 200);
                 
-                // Prepare image data for API
-                let imageData;
-                if (imageUrl.startsWith('data:')) {
-                    // File upload (base64)
-                    imageData = imageUrl;
-                } else {
-                    // URL input
-                    imageData = imageUrl;
-                }
-                
                 // Call AI API
-                const result = await callZhipuAIAPI(imageData, apiKey, customPrompt);
+                const result = await callZhipuAIAPI(imageUrl, apiKey, customPrompt);
                 
                 clearInterval(progressInterval);
                 progressBar.style.width = '100%';
                 progressText.textContent = '处理完成!';
                 
-                // 使用localStorage存储数据并重新加载页面
-                localStorage.setItem('ai_response_data', result);
-                localStorage.setItem('image_url', imageUrl);
-                
-                // 重新加载页面
-                window.location.reload();
+                // Display results after a short delay
+                setTimeout(() => {
+                    progressContainer.classList.add('hidden');
+                    displayResults(result, imageUrl);
+                    resultsContainer.classList.remove('hidden');
+                    
+                    // Auto copy if enabled
+                    if (document.getElementById('autoCopy').checked) {
+                        copyAllResults();
+                        showNotification('结果已自动复制到剪贴板', 'success');
+                    }
+                }, 500);
                 
             } catch (error) {
                 progressContainer.classList.add('hidden');
                 showNotification('处理失败: ' + error.message, 'error');
                 console.error('Error:', error);
-                
-                // Display error response info
-                const responseInfo = document.getElementById('responseInfo');
-                const responseContent = document.getElementById('responseContent');
-                responseContent.textContent = 'Error: ' + error.message;
-                responseInfo.classList.remove('hidden');
             }
         });
         
@@ -996,8 +847,7 @@ if (!empty($response_data)) {
             }
             
             const apiKey = apiKeyInput.value.trim() || localStorage.getItem('zhipuai_api_key');
-            const folderNameInput = document.getElementById('folderName');
-            const folderName = folderNameInput.value.trim();
+            const folderName = document.getElementById('folderName').value.trim() || new Date().toISOString().replace(/[:.]/g, '-');
             const customPrompt = document.getElementById('customPrompt').value.trim();
             
             if (!apiKey) {
@@ -1017,7 +867,7 @@ if (!empty($response_data)) {
             }
             
             // Update form fields
-            formFolderName.value = folderName || '';
+            formFolderName.value = folderName;
             formCustomPrompt.value = customPrompt;
             formApiKey.value = apiKey;
             formTagTypes.value = JSON.stringify(selectedTagTypes);
@@ -1032,9 +882,6 @@ if (!empty($response_data)) {
             batchProgressContainer.classList.remove('hidden');
             batchResultsContainer.classList.add('hidden');
             
-            // Hide response info
-            document.getElementById('responseInfo').classList.add('hidden');
-            
             try {
                 const response = await fetch('process.php', {
                     method: 'POST',
@@ -1046,16 +893,6 @@ if (!empty($response_data)) {
                 }
                 
                 const result = await response.json();
-                
-                // Display response info
-                const responseInfo = document.getElementById('responseInfo');
-                const responseContent = document.getElementById('responseContent');
-                responseContent.textContent = JSON.stringify(result, null, 2);
-                responseInfo.classList.remove('hidden');
-                
-                if (result.error) {
-                    throw new Error(result.error);
-                }
                 
                 // Update UI with results
                 successCount.textContent = result.success;
@@ -1071,126 +908,54 @@ if (!empty($response_data)) {
             } catch (error) {
                 showNotification('处理失败: ' + error.message, 'error');
                 batchProgressContainer.classList.add('hidden');
-                
-                // Display error response info
-                const responseInfo = document.getElementById('responseInfo');
-                const responseContent = document.getElementById('responseContent');
-                responseContent.textContent = 'Error: ' + error.message;
-                responseInfo.classList.remove('hidden');
             }
         });
         
-        // Display Results - 混合使用PHP解析和前端解析
+        // Display Results
         function displayResults(result, imageUrl) {
             // Display image
             resultImage.src = imageUrl;
             
-            // Clear previous results
-            document.getElementById('chineseDesc').textContent = '';
-            document.getElementById('englishDesc').textContent = '';
-            document.getElementById('chineseTags').innerHTML = '';
-            document.getElementById('englishTags').innerHTML = '';
+            // Extract content using regex
+            const chineseDescMatch = result.match(/★★中文描述★★\s*([\s\S]*?)(?=■■英文描述■■|$)/);
+            const englishDescMatch = result.match(/■■英文描述■■\s*([\s\S]*?)(?=【中文Tag标签】|$)/);
+            const chineseTagsMatch = result.match(/【中文Tag标签】\s*([^\]]*?)(?=\[英文Tag标签\]|$)/);
+            const englishTagsMatch = result.match(/\[英文Tag标签\]\s*([^\]]*?)(?=$)/);
             
-            // 检查是否有PHP解析后的数据
-            <?php if (!empty($parsedResponse)): ?>
-                // 使用PHP解析后的数据
-                const chineseDesc = '<?php echo addslashes($parsedResponse['cn']); ?>';
-                const englishDesc = '<?php echo addslashes($parsedResponse['en']); ?>';
-                const chineseTagsRaw = '<?php echo addslashes($parsedResponse['cn_tag']); ?>';
-                const englishTagsRaw = '<?php echo addslashes($parsedResponse['en_tag']); ?>';
-                
-                // Display descriptions
-                document.getElementById('chineseDesc').textContent = chineseDesc || '未找到中文描述';
-                document.getElementById('englishDesc').textContent = englishDesc || '未找到英文描述';
-                
-                // Display tags
-                const chineseTagsContainer = document.getElementById('chineseTags');
-                const englishTagsContainer = document.getElementById('englishTags');
-                
-                if (chineseTagsRaw) {
-                    // Handle Chinese tags - split by Chinese comma
-                    const tags = chineseTagsRaw.split('，').map(tag => tag.trim()).filter(tag => tag);
-                    tags.forEach(tag => {
-                        if (tag) {
-                            const tagElement = document.createElement('span');
-                            tagElement.className = 'tag-chip';
-                            tagElement.textContent = tag;
-                            chineseTagsContainer.appendChild(tagElement);
-                        }
-                    });
-                }
-                
-                if (englishTagsRaw) {
-                    // Handle English tags - split by English comma
-                    const tags = englishTagsRaw.split(',').map(tag => tag.trim()).filter(tag => tag);
-                    tags.forEach(tag => {
-                        if (tag) {
-                            const tagElement = document.createElement('span');
-                            tagElement.className = 'tag-chip';
-                            tagElement.textContent = tag;
-                            englishTagsContainer.appendChild(tagElement);
-                        }
-                    });
-                }
-                
-                console.log('使用PHP解析的数据:', {
-                    cn: chineseDesc,
-                    en: englishDesc,
-                    'cn-tag': chineseTagsRaw,
-                    'en-tag': englishTagsRaw
+            // Display descriptions
+            document.getElementById('chineseDesc').textContent = chineseDescMatch ? chineseDescMatch[1].trim() : '未找到中文描述';
+            document.getElementById('englishDesc').textContent = englishDescMatch ? englishDescMatch[1].trim() : '未找到英文描述';
+            
+            // Display tags
+            const chineseTagsContainer = document.getElementById('chineseTags');
+            const englishTagsContainer = document.getElementById('englishTags');
+            
+            chineseTagsContainer.innerHTML = '';
+            englishTagsContainer.innerHTML = '';
+            
+            if (chineseTagsMatch && chineseTagsMatch[1]) {
+                const tags = chineseTagsMatch[1].split(',').map(tag => tag.trim()).filter(tag => tag);
+                tags.forEach(tag => {
+                    if (tag) {
+                        const tagElement = document.createElement('span');
+                        tagElement.className = 'tag-chip';
+                        tagElement.textContent = tag;
+                        chineseTagsContainer.appendChild(tagElement);
+                    }
                 });
-            <?php else: ?>
-                // 如果没有PHP解析数据，尝试前端解析
-                console.log('前端解析原始数据:', result);
-                
-                // 处理thinking标签
-                let cleanContent = result.replace(/<\|begin_of_thought\|>.*?<\|end_of_thought\|>/gs, '').trim();
-                
-                // 尝试解析JSON
-                try {
-                    const jsonData = JSON.parse(cleanContent);
-                    const chineseDesc = jsonData.cn || '';
-                    const englishDesc = jsonData.en || '';
-                    const chineseTagsRaw = jsonData['cn-tag'] || '';
-                    const englishTagsRaw = jsonData['en-tag'] || '';
-                    
-                    document.getElementById('chineseDesc').textContent = chineseDesc || '未找到中文描述';
-                    document.getElementById('englishDesc').textContent = englishDesc || '未找到英文描述';
-                    
-                    // Display tags
-                    const chineseTagsContainer = document.getElementById('chineseTags');
-                    const englishTagsContainer = document.getElementById('englishTags');
-                    
-                    if (chineseTagsRaw) {
-                        const tags = chineseTagsRaw.split('，').map(tag => tag.trim()).filter(tag => tag);
-                        tags.forEach(tag => {
-                            if (tag) {
-                                const tagElement = document.createElement('span');
-                                tagElement.className = 'tag-chip';
-                                tagElement.textContent = tag;
-                                chineseTagsContainer.appendChild(tagElement);
-                            }
-                        });
+            }
+            
+            if (englishTagsMatch && englishTagsMatch[1]) {
+                const tags = englishTagsMatch[1].split(',').map(tag => tag.trim()).filter(tag => tag);
+                tags.forEach(tag => {
+                    if (tag) {
+                        const tagElement = document.createElement('span');
+                        tagElement.className = 'tag-chip';
+                        tagElement.textContent = tag;
+                        englishTagsContainer.appendChild(tagElement);
                     }
-                    
-                    if (englishTagsRaw) {
-                        const tags = englishTagsRaw.split(',').map(tag => tag.trim()).filter(tag => tag);
-                        tags.forEach(tag => {
-                            if (tag) {
-                                const tagElement = document.createElement('span');
-                                tagElement.className = 'tag-chip';
-                                tagElement.textContent = tag;
-                                englishTagsContainer.appendChild(tagElement);
-                            }
-                        });
-                    }
-                    
-                    console.log('前端JSON解析成功:', jsonData);
-                } catch (e) {
-                    console.log('前端JSON解析失败:', e);
-                    document.getElementById('chineseDesc').textContent = '解析失败，请查看控制台';
-                }
-            <?php endif; ?>
+                });
+            }
         }
         
         // Copy functionality
@@ -1227,16 +992,22 @@ if (!empty($response_data)) {
         function copyAllResults() {
             const chineseDesc = document.getElementById('chineseDesc').textContent;
             const englishDesc = document.getElementById('englishDesc').textContent;
-            const chineseTags = Array.from(document.getElementById('chineseTags').children).map(el => el.textContent).join('，');
+            const chineseTags = Array.from(document.getElementById('chineseTags').children).map(el => el.textContent).join(', ');
             const englishTags = Array.from(document.getElementById('englishTags').children).map(el => el.textContent).join(', ');
             
-            // Format as JSON string
-            const allResults = JSON.stringify({
-                "cn": chineseDesc,
-                "en": englishDesc,
-                "cn-tag": chineseTags,
-                "en-tag": englishTags
-            }, null, 2);
+            const allResults = `
+★★中文描述★★
+${chineseDesc}
+
+■■英文描述■■
+${englishDesc}
+
+【中文Tag标签】
+${chineseTags}
+
+[英文Tag标签]
+${englishTags}
+            `.trim();
             
             navigator.clipboard.writeText(allResults).then(() => {
                 showNotification('所有结果已复制到剪贴板', 'success');
@@ -1301,102 +1072,27 @@ if (!empty($response_data)) {
             }, 3000);
         }
         
-        // Clear previous results
-        function clearPreviousResults() {
-            // Clear text content
-            document.getElementById('chineseDesc').textContent = '';
-            document.getElementById('englishDesc').textContent = '';
+        // Mock AI API call for single image (replace with actual API call in production)
+        async function callZhipuAIAPI(imageUrl, apiKey, customPrompt = '') {
+            // Simulate API delay
+            await new Promise(resolve => setTimeout(resolve, 2000));
             
-            // Clear tag containers
-            document.getElementById('chineseTags').innerHTML = '';
-            document.getElementById('englishTags').innerHTML = '';
-            
-            // Reset to first tab
-            const resultTabs = document.querySelectorAll('.result-tab');
-            const tabContents = document.querySelectorAll('#tabContent > div');
-            
-            resultTabs.forEach(t => t.classList.remove('active', 'text-indigo-600', 'dark:text-indigo-400', 'border-indigo-600', 'dark:border-indigo-400'));
-            tabContents.forEach(content => content.classList.add('hidden'));
-            
-            if (resultTabs.length > 0) {
-                resultTabs[0].classList.add('active', 'text-indigo-600', 'dark:text-indigo-400', 'border-indigo-600', 'dark:border-indigo-400');
-                tabContents[0].classList.remove('hidden');
-            }
-        }
-        
-        // Call Zhipu AI API
-        async function callZhipuAIAPI(imageData, apiKey, customPrompt = '') {
-            // 系统提示词
+            // System prompt
             const systemPrompt = "你是一个AI绘画提示词专家。请根据我提供的图片进行文字描述，形成用于AI绘画的一段非常丰富的中英文画面详细描述，这些描述信息将重新用于AI绘画的prompt，并且另将中英文的prompt描述内容分别简化成对应的tag标签。最后返回的是一个 json 的数组数据信息， json 里面包含四段信息分别是：cn（用于AI绘画的中文详细自然语言信息Prompt）、en （用于AI绘画的英文详细信息Prompt）、cn-tag（中文Tag标签用中文逗号内部区分）、en-tag(英文Tag标签用英文逗号内部隔开)。不需要输出无用markdown语言注释信息，直接输出 json 格式的数据。";
             
-            const fullPrompt = customPrompt ? customPrompt + "\n" + systemPrompt : systemPrompt;
+            // Combine custom prompt with system prompt if provided
+            const fullPrompt = customPrompt ? `${customPrompt}\n${systemPrompt}` : systemPrompt;
             
-            // 添加重试机制
-            const maxRetries = 3;
-            const retryDelay = 5000; // 5秒
-            
-            for (let attempt = 1; attempt <= maxRetries; attempt++) {
-                try {
-                    const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${apiKey}`
-                        },
-                        body: JSON.stringify({
-                            model: 'glm-4.5v',
-                            messages: [
-                                {
-                                    role: 'user',
-                                    content: [
-                                        {
-                                            type: 'text',
-                                            text: fullPrompt
-                                        },
-                                        {
-                                            type: 'image_url',
-                                            image_url: {
-                                                url: imageData
-                                            }
-                                        }
-                                    ]
-                                }
-                            ],
-                            thinking: {
-                                type: 'enabled'
-                            },
-                            max_tokens: 1024
-                        })
-                    });
-                    
-                    if (response.status === 429) {
-                        // 处理429错误
-                        if (attempt < maxRetries) {
-                            console.log(`Attempt ${attempt} failed with 429. Retrying in ${retryDelay}ms...`);
-                            await new Promise(resolve => setTimeout(resolve, retryDelay));
-                            continue;
-                        } else {
-                            throw new Error('请求过于频繁，请稍后再试 (429 Too Many Requests)');
-                        }
-                    }
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    
-                    const data = await response.json();
-                    const aiContent = data.choices[0].message.content;
-                    
-                    // 直接返回原始AI内容，让PHP来处理解析
-                    return aiContent;
-                } catch (error) {
-                    if (attempt >= maxRetries) {
-                        throw error;
-                    }
-                    console.log(`Attempt ${attempt} failed: ${error.message}. Retrying...`);
-                    await new Promise(resolve => setTimeout(resolve, retryDelay));
-                }
-            }
+            // In a real implementation, this would make an actual API call to ZhipuAI
+            // For demo purposes, return mock data
+            return `
+{
+  "CN": "一座繁华都市的街道景象，阳光透过高楼大厦的玻璃幕墙洒在石板路上，形成斑驳的光影效果。街道两旁种植着茂盛的梧桐树和樱花树，春天时节粉色的花瓣飘洒在地面上。远处是现代化的摩天大楼群，近处是充满欧式风情的石板路面和古典建筑。街道上行人络绎不绝，有穿着时尚的年轻男女、推着婴儿车的父母、骑着自行车的学生。天空湛蓝，几朵白云悠闲地飘过，整个画面呈现出一种宁静而美好的都市生活氛围。",
+  "EN": "A bustling city street scene with sunlight streaming through the glass facades of skyscrapers onto the cobblestone streets, creating dappled light effects. The streets are lined with lush plane trees and cherry blossom trees, with pink petals gently falling on the ground during spring season. In the distance, modern skyscraper towers rise against the sky, while in the foreground, classical European-style stone pavements and buildings create an elegant atmosphere. Pedestrians walk leisurely along the street, including fashionable young couples, parents pushing baby strollers, and students riding bicycles. The sky is clear blue with fluffy white clouds drifting by, creating a serene and beautiful urban lifestyle atmosphere.",
+  "CN_tag": "城市街道, 阳光, 玻璃幕墙, 石板路, 梧桐树, 樱花树, 摩天大楼, 欧式建筑, 行人, 春天, 蓝天, 白云, 美好氛围",
+  "EN_tag": "city street, sunlight, glass facade, cobblestone road, plane tree, cherry blossom tree, skyscraper, european architecture, pedestrians, spring season, blue sky, white cloud, peaceful atmosphere"
+}
+            `.trim();
         }
     </script>
 </body>
